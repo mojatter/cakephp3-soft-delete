@@ -13,12 +13,25 @@ This plugins has been developed for cakephp 3.x.
 
 ## Installation
 
-You can install this plugin into your CakePHP application using [composer](http://getcomposer.org).
+You can install this plugin into your CakePHP application using [composer](http://getcomposer.org) vcs.
 
 Update your composer file to include this plugin:
 
+```json
+"repositories": [{
+    "type": "vcs",
+    "url": "https://github.com/mojatter/cakephp3-soft-delete"
+}],
+"require": {
+    "cakephp/cakephp": "~3.1",
+    "cakephp/plugin-installer": "*",
+    // ...,
+    "mojatter/cakephp3-soft-delete": "~1.0",
+},
 ```
-composer require mojatter/cakephp3-soft-delete "~1.0"
+
+```
+composer update
 ```
 
 ## Configuration
