@@ -25,7 +25,6 @@ Update your composer file to include this plugin:
 "require": {
     "cakephp/cakephp": "~3.1",
     "cakephp/plugin-installer": "*",
-    // ...,
     "mojatter/cakephp3-soft-delete": "dev-mojatter",
 },
 ```
