@@ -1,172 +1,115 @@
 <?php
+
 namespace SoftDelete\Model\Table;
 
 use Cake\ORM\RulesChecker;
 use Cake\Datasource\EntityInterface;
-use SoftDelete\Error\MissingColumnException;
-use SoftDelete\ORM\Query;
 
-trait SoftDeleteTrait {
+trait SoftDeleteTrait
+{
+    public $enableSoftDelete = true;
 
-    /**
-     * Get the configured deletion field
-     *
-     * @return string
-     * @throws \SoftDelete\Error\MissingFieldException
-     */
-    public function getSoftDeleteField()
+    public function getSoftDeleteConfig($name = false)
     {
-        if (isset($this->softDeleteField)) {
-            $field = $this->softDeleteField;
-        } else {
+        $config = false;
+        if (isset($this->softDeleteConfig)) {
+            $config = $this->softDeleteConfig;
+        }
+        if (!$config) {
             $field = 'deleted';
+            if (isset($this->softDeleteField)) {
+                $field = $this->softDeleteField;
+            }
+            $config = [
+                'values' => [$field => date('Y-m-d H:i:s')],
+                'without' => [$field . ' is' => null],
+                'in' => [$field . ' is not' => null]
+            ];
         }
-
-        if ($this->schema()->column($field) === null) {
-            throw new MissingColumnException(
-                __('Configured field `{0}` is missing from the table `{1}`.',
-                    $field,
-                    $this->alias()
-                )
-            );
+        if ($name) {
+            return isset($config[$name]) ? $config[$name]: false;
         }
+        return $config;
+    }
 
-        return $field;
+    public function getSoftDeleteValues()
+    {
+        return $this->getSoftDeleteConfig('values');
+    }
+
+    public function getWithoutSoftDeleteConditions()
+    {
+        return $this->getSoftDeleteConfig('without');
+    }
+
+    public function getInSoftDeleteConditions()
+    {
+        return $this->getSoftDeleteConfig('in');
     }
 
     public function query()
     {
-        return new Query($this->connection(), $this);
+        return new SoftDeleteQuery($this->connection(), $this);
     }
 
-    /**
-     * Perform the delete operation.
-     *
-     * Will soft delete the entity provided. Will remove rows from any
-     * dependent associations, and clear out join tables for BelongsToMany associations.
-     *
-     * @param \Cake\DataSource\EntityInterface $entity The entity to soft delete.
-     * @param \ArrayObject $options The options for the delete.
-     * @throws \InvalidArgumentException if there are no primary key values of the
-     * passed entity
-     * @return bool success
-     */
-    protected function _processDelete($entity, $options)
+    public function dispatchEvent($name, $data = null, $subject = null)
     {
-        if ($entity->isNew()) {
-            return false;
-        }
-
-        $primaryKey = (array)$this->primaryKey();
-        if (!$entity->has($primaryKey)) {
-            $msg = 'Deleting requires all primary key values.';
-            throw new \InvalidArgumentException($msg);
-        }
-
-        if ($options['checkRules'] && !$this->checkRules($entity, RulesChecker::DELETE, $options)) {
-            return false;
-        }
-
-        $event = $this->dispatchEvent('Model.beforeDelete', [
-            'entity' => $entity,
-            'options' => $options
-        ]);
-
+        $event = parent::dispatchEvent($name, $data, $subject);
         if ($event->isStopped()) {
-            return $event->result;
+            return $event;
         }
+        if ($this->enableSoftDelete && $name == 'Model.beforeDelete'
+                && $data && isset($data['entity']) && isset($data['options'])) {
+            $entity = $data['entity'];
+            $options = $data['options'];
 
-        $this->_associations->cascadeDelete(
-            $entity,
-            ['_primary' => false] + $options->getArrayCopy()
-        );
+            $this->_associations->cascadeDelete(
+                $entity,
+                ['_primary' => false] + $options->getArrayCopy()
+            );
 
-        $query = $this->query();
-        $conditions = (array)$entity->extract($primaryKey);
-        $statement = $query->update()
-            ->set([$this->getSoftDeleteField() => date('Y-m-d H:i:s')])
-            ->where($conditions)
-            ->execute();
+            $primaryKey = (array)$this->primaryKey();
+            $conditions = (array)$entity->extract($primaryKey);
+            $event->result = $this->deleteAll($conditions);
 
-        $success = $statement->rowCount() > 0;
-        if (!$success) {
-            return $success;
+            parent::dispatchEvent('Model.afterDelete', [
+                'entity' => $entity,
+                'options' => $options
+            ]);
+            $event->stopPropagation();
         }
-
-        $this->dispatchEvent('Model.afterDelete', [
-            'entity' => $entity,
-            'options' => $options
-        ]);
-
-        return $success;
+        return $event;
     }
 
-    /**
-     * Soft deletes all records matching `$conditions`.
-     * @return int number of affected rows.
-     */
     public function deleteAll($conditions)
     {
-        $query = $this->query()
-            ->update()
-            ->set([$this->getSoftDeleteField() => date('Y-m-d H:i:s')])
-            ->where($conditions);
-        $statement = $query->execute();
-        $statement->closeCursor();
-        return $statement->rowCount();
-    }
-
-    /**
-     * Hard deletes the given $entity.
-     * @return bool true in case of success, false otherwise.
-     */
-    public function hardDelete(EntityInterface $entity)
-    {
-        if(!$this->delete($entity)) {
-            return false;
+        if ($this->enableSoftDelete) {
+            $values = $this->getSoftDeleteValues();
+            $statement = $this->query()->update()
+                ->set($values)->where($conditions)->execute();
+            $rowCount = $statement->rowCount();
+            $statement->closeCursor();
+            return $rowCount;
+        } else {
+            return parent::deleteAll($conditions);
         }
-        $primaryKey = (array)$this->primaryKey();
-        $query = $this->query();
-        $conditions = (array)$entity->extract($primaryKey);
-        $statement = $query->delete()
-            ->where($conditions)
-            ->execute();
-
-        $success = $statement->rowCount() > 0;
-        if (!$success) {
-            return $success;
-        }
-
-        return $success;
     }
 
-    /**
-     * Hard deletes all records that were soft deleted before a given date.
-     * @param \DateTime $until Date until which soft deleted records must be hard deleted.
-     * @return int number of affected rows.
-     */
-    public function hardDeleteAll(\Datetime $until)
+    public function hardDelete(EntityInterface $entity, $options = [])
     {
-        $query = $this->query()
-            ->delete()
-            ->where([
-                $this->getSoftDeleteField() . ' IS NOT NULL',
-                $this->getSoftDeleteField() . ' <=' => $until->format('Y-m-d H:i:s')
-            ]);
-        $statement = $query->execute();
-        $statement->closeCursor();
-        return $statement->rowCount();
+        $org = $this->enableSoftDelete;
+        $this->enableSoftDelete = false;
+        $result = $this->delete($entity, $options);
+        $this->enableSoftDelete = $org;
+        return $result;
     }
 
-    /**
-     * Restore a soft deleted entity into an active state.
-     * @param EntityInterface $entity Entity to be restored.
-     * @return bool true in case of success, false otherwise.
-     */
-    public function restore(EntityInterface $entity)
+    public function hardDeleteAll($conditions)
     {
-        $softDeleteField = $this->getSoftDeleteField();
-        $entity->$softDeleteField = null;
-        return $this->save($entity);
+        $org = $this->enableSoftDelete;
+        $this->enableSoftDelete = false;
+        $result = $this->deleteAll($conditions);
+        $this->enableSoftDelete = $org;
+        return $result;
     }
 }

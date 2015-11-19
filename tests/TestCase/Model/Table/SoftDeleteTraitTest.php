@@ -199,13 +199,17 @@ class SoftDeleteBehaviorTest extends TestCase
      */
     public function testHardDeleteAll()
     {
-        $affectedRows = $this->postsTable->hardDeleteAll(new \DateTime('now'));
+        $affectedRows = $this->postsTable->hardDeleteAll([
+            'deleted <=' => new \DateTime('now')
+        ]);
         $this->assertEquals(0, $affectedRows);
 
         $postsRowsCount = $this->postsTable->find('all', ['withDeleted'])->count();
 
         $this->postsTable->delete($this->postsTable->get(1));
-        $affectedRows = $this->postsTable->hardDeleteAll(new \DateTime('now'));
+        $affectedRows = $this->postsTable->hardDeleteAll([
+            'deleted <=' => new \DateTime('now')
+        ]);
         $this->assertEquals(1, $affectedRows);
 
         $newpostsRowsCount = $this->postsTable->find('all', ['withDeleted'])->count();
@@ -222,6 +226,18 @@ class SoftDeleteBehaviorTest extends TestCase
     {
         $query = $this->tagsTable->find();
         $this->assertEquals(2, $query->count());
+
+        $query = $this->tagsTable->find('all', [
+            'withDeleted' => false,
+            'conditions' => ['id' => 3]
+        ]);
+        $this->assertEquals(0, $query->count());
+
+        $query = $this->tagsTable->find('all', [
+            'withDeleted' => true,
+            'conditions' => ['id' => 3]
+        ]);
+        $this->assertEquals(1, $query->count());
 
         $query = $this->tagsTable->find('all', ['withDeleted' => true]);
         $this->assertEquals(3, $query->count());
@@ -261,35 +277,5 @@ class SoftDeleteBehaviorTest extends TestCase
             ->first();
 
         $this->assertEquals(null, $tag);
-    }
-
-    /**
-     * Test soft deleting and restoring a record.
-     * @return void
-     */
-    public function testRestore()
-    {
-        $user = $this->usersTable->findById(1)->first();
-        $this->assertNotNull($user);
-        $this->usersTable->delete($user);
-        $user = $this->usersTable->findById(1)->first();
-        $this->assertNull($user);
-
-        $user = $this->usersTable->find('all', ['withDeleted'])->where(['id' => 1])->first();
-        $this->usersTable->restore($user);
-        $user = $this->usersTable->findById(1)->first();
-        $this->assertNotNull($user);
-    }
-
-    /**
-     * When a configured field is missing from the table, an exception should be thrown
-     *
-     * @expectedException \SoftDelete\Error\MissingColumnException
-     */
-    public function testMissingColumn()
-    {
-        $this->postsTable->softDeleteField = 'foo';
-        $post = $this->postsTable->get(1);
-        $this->postsTable->delete($post);
     }
 }

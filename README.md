@@ -1,6 +1,6 @@
-# CakeSoftDelete plugin for CakePHP
+NOTE: A redesigned version of the forked [PGBI/cakephp3-soft-delete](http://github.com/pgbi/cakephp3-soft-delete)
 
-[![Build status](https://api.travis-ci.org/PGBI/cakephp3-soft-delete.png?branch=master)](https://travis-ci.org/PGBI/cakephp3-soft-delete)
+# CakeSoftDelete plugin for CakePHP
 
 ## Purpose
 
@@ -18,7 +18,7 @@ You can install this plugin into your CakePHP application using [composer](http:
 Update your composer file to include this plugin:
 
 ```
-composer require pgbi/cakephp3-soft-delete "~1.0"
+composer require mojatter/cakephp3-soft-delete "~1.0"
 ```
 
 ## Configuration
@@ -55,9 +55,58 @@ class UsersTable extends Table
 {
     use SoftDeleteTrait;
 
-    protected $softDeleteField = 'deleted_date';
+    protected $softDeleteConfig = [
+        'values' => [
+            'is_deleted' => 1,
+            'deleted' => date('Y-m-d H:i:s', $_SERVER['REQUEST_TIME'])
+        ],
+        'without' => ['is_deleted' => 0],
+        'in' => ['is_deleted' => 1]
+    ];
     ...
 ```
+
+Other examples.
+
+```sql
+create table users (
+    id int not null auto_increment,
+    email varchar(255) not null,
+    is_deleted int not null default 0,
+    deleted datetime default null,
+    constraint pk primary key (id),
+    constraint uk unique key (email, is_deleted)
+);
+
+-- soft deleting using column `id`
+update users set is_deleted = id, deleted = now() where id = 1;
+-- selecting active users
+select * from users where is_deleted = 0;
+-- selecting soft deleted users
+select * from users where is_deleted > 0;
+```
+
+```php
+// in src/Model/Table/UsersTable.php
+...
+use SoftDelete\Model\Table\SoftDeleteTrait;
+use Cake\Database\Expression\IdentifierExpression;
+
+class UsersTable extends Table
+{
+    use SoftDeleteTrait;
+
+    protected $softDeleteConfig = [
+        'values' => [
+            'is_deleted' => new IdentifierExpression('id'),
+            'deleted' => IdentifierExpression('now()')
+        ],
+        'without' => ['is_deleted' => 0],
+        'in' => ['is_deleted >' => 0]
+    ];
+    ...
+```
+
 
 ## Use
 
@@ -70,17 +119,6 @@ class UsersTable extends Table
 $this->delete($user); // $user entity is now soft deleted if UsersTable uses SoftDeleteTrait.
 ```
 
-### Restoring Soft deleted records
-
-To restore a soft deleted entity into an active state, use the `restore` method:
-
-```php
-// in src/Model/Table/UsersTable.php
-// Let's suppose $user #1 is soft deleted.
-$user = $this->Users->find('all', ['withDeleted'])->where('id', 1)->first();
-$this->restore($user); // $user #1 is now restored.
-```
-
 ### Finding records
 
 `find`, `get` or dynamic finders (such as `findById`) will only return non soft deleted records.
@@ -90,6 +128,10 @@ To also return soft deleted records, `$options` must contain `'withDeleted'`. Ex
 // in src/Model/Table/UsersTable.php
 $nonSoftDeletedRecords = $this->find('all');
 $allRecords            = $this->find('all', ['withDeleted']);
+$maleOfAllRecords      = $this->find('all', [
+  'withDeleted' => true,
+  'conditions' => ['gender' => 'male']
+]);
 ```
 
 ### Hard deleting records
@@ -101,12 +143,12 @@ $user = $this->get($userId);
 $success = $this->hardDelete($user);
 ```
 
-To mass hard delete records that were soft deleted before a given date, you can use hardDeleteAll($date):
+To hard delete entities:
 
 ```
 // in src/Model/Table/UsersTable.php
-$date = new \DateTime('some date');
-$affectedRowsCount = $this->hardDeleteAll($date);
+$this->hardDeleteAll([]); // all
+$this->hardDeleteAll(['deleted is not' => null]); // only soft delete
 ```
 
 ## Soft deleting & associations

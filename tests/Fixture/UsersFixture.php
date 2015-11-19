@@ -30,6 +30,7 @@ class UsersFixture extends TestFixture {
             'primary' => ['type' => 'primary', 'columns' => ['id']]
         ]
     ];
+
     public $records = [
         [
             'id'          => 1,
