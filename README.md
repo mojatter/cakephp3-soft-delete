@@ -25,9 +25,11 @@ Update your composer file to include this plugin:
 "require": {
     "cakephp/cakephp": "~3.1",
     "cakephp/plugin-installer": "*",
-    "mojatter/cakephp3-soft-delete": "dev-mojatter",
+    "pgbi/cakephp3-soft-delete": "dev-mojatter",
 },
 ```
+
+**CAUTION: Sorry, This installation has a probrem. `The requested package pgbi/cakephp3-soft-delete could not be found in any version, there may be a typo in the package name`. Would you help?**
 
 ```
 composer update
