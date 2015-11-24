@@ -58,8 +58,11 @@ trait SoftDeleteTrait
         if ($event->isStopped()) {
             return $event;
         }
-        if ($this->enableSoftDelete && $name == 'Model.beforeDelete'
-                && $data && isset($data['entity']) && isset($data['options'])) {
+        if ($this->enableSoftDelete
+                && $name == 'Model.beforeDelete'
+                && $data
+                && isset($data['entity'])
+                && isset($data['options'])) {
             $entity = $data['entity'];
             $options = $data['options'];
 
