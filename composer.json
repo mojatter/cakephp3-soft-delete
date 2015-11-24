@@ -2,7 +2,7 @@
     "name": "mojatter/cakephp3-soft-delete",
     "description": "SoftDelete plugin for CakePHP",
     "keywords": ["cakephp", "cakephp 3", "plugin", "soft", "delete", "deletable"],
-    "homepage": "https://github.com/pgbi/cakephp3-soft-delete",
+    "homepage": "https://github.com/mojatter/cakephp3-soft-delete",
     "type": "cakephp-plugin",
     "license": "MIT",
     "support": {
@@ -10,8 +10,9 @@
     },
     "require": {
         "php": ">=5.4",
-        "cakephp/plugin-installer": "*",
-        "cakephp/cakephp": "~3.0"
+        "cakephp/plugin-installer": "~1.0",
+        "cakephp/cakephp": "~3.0",
+        "pgbi/cakephp3-soft-delete": "~1.3"
     },
     "require-dev": {
         "phpunit/phpunit": "*"
@@ -26,5 +27,9 @@
             "SoftDelete\\Test\\": "tests",
             "Cake\\Test\\": "./vendor/cakephp/cakephp/tests"
         }
-    }
+    },
+    "repositories": [{
+        "type": "vcs",
+        "url": "https://github.com/mojatter/cakephp3-soft-delete"
+    }],
 }
